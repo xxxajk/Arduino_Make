@@ -1,0 +1,445 @@
+#
+# Makefile for building Arduino projects outside of the Arduino environment
+#
+# Installation note.
+# Place this file in ~/Arduino/Arduino_Make
+#
+# Even better:
+#        just 'git pull' from your Arduino directory (where your sketches are)
+#
+# Copyright(left) 2016 Andrew J. Kroll  All rights reserved.
+# Use is subject to license terms.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#  1. Redistributions of source code must retain the above copyright notice,
+#     this list of conditions and the following disclaimer.
+#
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY ALAN BURLISON "AS IS" AND ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+# EVENT SHALL ALAN BURLISON OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# This makefile should be included into a per-project Makefile.
+# Examples:
+#
+# ----------
+# BOARD =arduino:avr:mega:cpu=atmega2560
+# PORT =/dev/ACM0
+# include ../Arduino_Makefile_master/Makefile.master
+# ----------
+#
+# ----------
+# BOARD =arduino:avr:mega:cpu=atmega1280
+# PORT =/dev/ACM0
+# CPORT =/dev/ACM1
+# include ../Arduino_Makefile_master/Makefile.master
+# ----------
+#
+# ----------
+# BOARD =arduino:avr:uno
+# PORT =/dev/ACM0
+# include ../Arduino_Makefile_master/Makefile.master
+# ----------
+#
+# ----------
+# BOARD =world-domination:bite-me:hard
+# PORT =localhost:4242
+# CPORT =/dev/ACM0
+# include ../Arduino_Makefile_master/Makefile.master
+# ----------
+#
+# Where:
+#        BOARD                : Fully Qualified Board Name (fqbn)
+#
+# One or both of the following must be defined
+#        PORT                 : what device/network url to use for programming, if not given, defaults to the value used for CPORT
+#        CPORT                : what device/network url to use for the monitor, if not given, defaults to the value used for PORT
+#
+# Before using this Makefile you can define the following macros to suit
+# your environment, either by editing this file directly, or by defining them 
+# in the Makefile that includes this one, in which case they will override the
+# default or automatically discovered definitions.
+#
+#   ARD_HOME        : Installation directory of the Arduino software.
+#   OBJ_PATH_BASE   : Base directory name for complied objects.
+#   EXTRA_FLAGS     : Any extra flags and defines.
+#   MON_SPEED       : Serial monitor speed, default is 115200.
+#   WHICH           : The GNU or system which utility.
+#   MKDIR           : The GNU or system mkdir utility.
+#   RM              : The GNU or system rm utility.
+#   MV              : The GNU or system mv utility.
+#   FIND            : The GNU or system find utility.
+#   UNIQ            : The GNU or system uniq utility.
+#   DIRNAME         : The GNU or system dirname utlity.
+#   SED             : The GNU or system sed utility.
+#   GREP            : The GNU or system grep utility.
+#   CP              : The GNU or system cp utility.
+#   CUT             : The GNU or system cut utility.
+#   HEAD            : The GNU or system head utility.
+#   TR              : The GNU or system tr utility.
+
+WHICH ?=which
+FIND ?=find
+MKDIR ?=mkdir -p
+RM ?=rm -fr
+MV ?=mv -f
+UNIQ ?=uniq
+DIRNAME ?=dirname
+SED ?=sed
+GREP ?=grep
+CP ?=cp
+CUT ?=cut
+HEAD ?=head
+TR ?=tr
+READLINK ?=readlink
+BASENAME ?=basename
+ECHO ?=echo
+
+
+DEBUG_Makefile ?=0
+
+ifeq ($(strip $(DEBUG_Makefile)),0)
+MAKE_QUIET_BUILD?=@
+MAKE_QUIET_LINK?=@
+endif
+
+#
+# TO-DO: Check if this file or calling Makefile has changed
+#
+
+### Nothing below here should require editing. ###
+
+# Global configuration.
+$(info Gathering build parameters...)
+#
+# Working shell list:
+WORKING_SH =/bin/ash /bin/bash /bin/ksh /bin/dash
+
+#
+# Not working, and may never work
+BROKEN_SH =/bin/zsh /bin/csh /bin/tcsh /bin/rksh
+
+REAL_SH=$(strip $(shell $(READLINK) -f $(SHELL)))
+ifneq ($(strip $(findstring $(SHELL),$(BROKEN_SH))),)
+$(info Your shell $(SHELL) aka $(REAL_SH) is broken, please use another shell)
+$(info Known working shells are $(WORKING_SH))
+$(error BROKEN SHELL)
+endif
+
+GOOD_SH=$(findstring $(REAL_SH),$(WORKING_SH))
+BAD_SH=$(findstring $(REAL_SH),$(BROKEN_SH))
+
+ifeq ($(strip $(GOOD_SH)),)
+ifeq ($(strip $(BAD_SH)),)
+$(warning Your shell $(REAL_SH) is unknown, please report on github if it works or not. )
+else
+$(info Your shell $(REAL_SH) is broken, please use another shell)
+$(info Known working shells are $(WORKING_SH))
+$(error BROKEN SHELL)
+endif
+endif
+
+DATESECONDS :=$(shell date -u +"%s")
+
+MON_SPEED ?=115200
+
+# Check for the required definitions.
+ifndef BOARD
+    $(error BOARD not defined)
+endif
+
+ifndef PORT
+    ifndef CPORT
+        $(error PORT not defined)
+    else
+        PORT =$(CPORT)
+    endif
+endif
+
+CPORT ?=$(PORT)
+
+# Set default values if ARD_HOME is not defined.
+PLATFORM =$(shell uname -s)
+ifndef ARD_HOME
+    ifeq "$(PLATFORM)" "SunOS"
+        ARD_HOME =/opt/Arduino
+    else ifeq "$(PLATFORM)" "Linux"
+        ARD_HOME =$(shell $(DIRNAME) `$(WHICH) arduino 2> /dev/null || echo /opt/Arduino/arduino`)
+    else ifeq "$(PLATFORM)" "Darwin"
+        ARD_HOME =/Applications/Arduino.app
+    else
+        $(error Please define ARD_HOME)
+    endif
+endif
+
+# Make it easier for Mac users, so they only have to define the path to the application.
+ifneq ($(wildcard $(ARD_HOME)/Contents/Resources/Java/hardware/tools/avr/bin/avrdude),)
+    ARD_HOME :=$(ARD_HOME)/Contents/Resources/Java
+else ifneq ($(wildcard $(ARD_HOME)/Contents/Java/hardware/tools/avr/bin/avrdude),)
+    ARD_HOME :=$(ARD_HOME)/Contents/Java
+endif
+
+
+# ARD_HOME set, does it exist?
+ifeq ($(wildcard $(ARD_HOME)),)
+    $(error $(ARD_HOME) does not exist)
+endif
+
+# Platform-specific settings.
+ifeq "$(PLATFORM)" "SunOS"
+    define monitor-target
+        gnome-terminal -t '$(BOARD) $(CPORT)' \
+        -e 'env -i tip -$(MON_SPEED) $(CPORT)' &
+    endef
+    ifeq "$(CPORT)" "$(PORT)"
+        define kill-monitor
+            - pkill -f 'tip.*$(CPORT)'
+            - sleep 10
+        endef
+    endif
+else ifeq "$(PLATFORM)" "Linux"
+    ifeq ($(MON_SPEED),$(filter $(MON_SPEED), 230400 500000 1000000)) 
+        define monitor-target
+            cu -l $(CPORT) -s $(MON_SPEED)
+        endef
+    else
+        define monitor-target
+            screen $(CPORT) $(MON_SPEED)
+        endef
+    endif
+    ifeq "$(CPORT)" "$(PORT)"
+        define kill-monitor
+            - pkill -f 'screen.*$(CPORT)'
+            - pkill -f 'cu.*$(CPORT)'
+            - sleep 10
+        endef
+    endif
+
+else ifeq "$(PLATFORM)" "Darwin"
+    define monitor-target
+        screen $(CPORT) $(MON_SPEED)
+    endef
+    ifeq "$(CPORT)" "$(PORT)"
+        define kill-monitor
+            - pkill -f 'screen.*$(CPORT)'
+            - pkill -f 'cu.*$(CPORT)'
+            - sleep 10
+        endef
+    endif
+else
+    $(error Unknown platform $(PLATFORM))
+endif
+
+OBJ_PATH_BASE ?=../build
+# Standard macros.
+SKETCH =$(shell basename $(CURDIR)).ino
+$(info SKETCH $(SKETCH))
+BUILD_PATH_BASE =$(OBJ_PATH_BASE)/$(SKETCH)
+
+ifeq ($(strip $(ARD_VERSION)),)
+#
+# $(ARD_HOME)/lib/version.txt is the correct place to look, HOWEVER...
+# SOMETIMES the 'version' is fully non-numeric, e.g. 'nightly' etc.
+# In the case this fails, we try the last resort hack below, instead
+#
+ARD_VERSION =$(strip $(shell $(SED) -e '/^[0-9.]*.*/!d;s/^\([0-9.]*\).*/\1/' < $(ARD_HOME)/lib/version.txt))
+endif
+
+ifeq ($(strip $(ARD_VERSION)),)
+#
+# LAST RESORT HACK: Read version by parsing the 'revisions.txt' file.
+# Version is in the following format: ARDUINO x.x.x
+ARD_VERSION =$(shell $(SED) -e '/^ARDUINO/!d;s/^ARDUINO //;s/\([0-9.]*\).*/\1/;q' < $(ARD_HOME)/revisions.txt )
+endif
+
+
+ifeq ($(strip $(ARD_VERSION)),)
+$(error Please define ARD_VERSION . e.g. ARD_VERSION=1.6.7 )
+endif
+
+ARD_WORDS =$(subst ., ,$(ARD_VERSION))
+ARD_MAJOR =$(word 1,$(ARD_WORDS))
+ARD_RAW_MINOR =$(word 2,$(ARD_WORDS))
+ARD_RAW_PATCH =$(word 3,$(ARD_WORDS))
+
+#
+# First, fix versioning stupidity, missing minor should be rare :-)
+#
+ifeq ($(strip $(ARD_RAW_MINOR)),)
+ARD_RAW_MINOR =0
+endif
+ifeq ($(strip $(ARD_RAW_PATCH)),)
+ARD_RAW_PATCH =0
+endif
+
+#
+#  Now for some screwy details. Arduino 1.6 and higher pads the version with zeros.
+#  We must detect this here, and pad
+#
+ARD_MA =$(ARD_MAJOR)$(ARD_RAW_MINOR)
+ifeq ($(ARD_MA),$(filter $(ARD_MA),10 11 12 13 14 15))
+# < 1.6, no padding
+$(error Arduino-$(ARD_VERSION) too old.)
+else
+# >= 1.6, pad as needed.
+ifeq ($(ARD_RAW_MINOR),$(filter $(ARD_RAW_MINOR),0 1 2 3 4 5 6 7 8 9))
+ARD_MINOR = 0$(ARD_RAW_MINOR)
+else
+ARD_MINOR = $(ARD_RAW_MINOR)
+endif
+ifeq ($(ARD_RAW_PATCH),$(filter $(ARD_RAW_PATCH),0 1 2 3 4 5 6 7 8 9))
+ARD_PATCH =0$(ARD_RAW_PATCH)
+else
+ARD_PATCH =$(ARD_RAW_PATCH)
+endif
+endif
+
+ARD_MM =$(ARD_MAJOR)$(ARD_MINOR)
+ARD_REV =$(ARD_MAJOR)$(ARD_MINOR)$(ARD_PATCH)
+
+
+# Does arduino builder exist? If not, IDE too old.
+ifeq ($(wildcard $(ARD_HOME)/arduino-builder),)
+    $(error Arduino-$(ARD_VERSION) too old.)
+endif
+
+$(info Arduino-$(ARD_VERSION) $(ARD_REV))
+
+serial_aDjOkT_port_aDjOkT_file = $(PORT)
+serial_aDjOkT_port = $(PORT)
+build_aDjOkT_project_name=$(SKETCH)
+
+build.extra_flags=-DEXTRA $(EXTRA_FLAGS) -DFLAGS
+
+ifneq ($(strip $(EXTRA_FLAGS)),)
+BUILDER_EXTRA+="-prefs=build.extra_flags=$(EXTRA_FLAGS)"
+endif
+
+BUILDER_HW=-fqbn=$(BOARD) -hardware "$(ARD_HOME)/hardware" -hardware "$(HOME)/.arduino15/packages" -hardware "$(HOME)/Arduino/hardware"
+BUILDER_TOOLS=-tools "$(ARD_HOME)/tools-builder" -tools "$(ARD_HOME)/hardware" -tools "$(HOME)/.arduino15/packages" -tools "$(HOME)/Arduino/hardware"
+BUILDER_LIBS=-built-in-libraries "$(ARD_HOME)/libraries" -libraries "$(HOME)/Arduino/libraries" 
+BUILDER_EXTRA+= -prefs=build.warn_data_percentage=75 
+BUILDER_OPTS=$(BUILDER_EXTRA) -ide-version=$(ARD_REV) $(BUILDER_HW) $(BUILDER_TOOLS) $(BUILDER_LIBS)
+
+# Get build info _ONLY_
+$(foreach line,$(shell $(ARD_HOME)/arduino-builder -dump-prefs -logger=machine $(BUILDER_OPTS) -build-path "$(CURDIR)" | $(GREP) -v === | $(SED) -e '/^\s*#/d;/.*=\s*$$/d;/.*\..*=.*/!d;s/\./_aDjOkT_/g;s/{/\$${/g;/^\s*$$/d;s/ /_aSjPkC_/g;s/$$/ /g;s/=/\=/' | $(GREP) -e "^build_aDjOkT_"),$(eval $(subst _aSjPkC_, ,$(line))))
+#$(info build_aDjOkT_core $(build_aDjOkT_core))
+#$(info build_aDjOkT_board $(build_aDjOkT_board))
+#$(info build_aDjOkT_arch $(build_aDjOkT_arch))
+#$(info build_aDjOkT_mcu $(build_aDjOkT_mcu))
+
+BUILD_PATH ?=$(CURDIR)/$(BUILD_PATH_BASE)/_$(build_aDjOkT_core)/_$(build_aDjOkT_board)/_$(build_aDjOkT_arch)/_$(build_aDjOkT_mcu)
+build_aDjOkT_path=$(BUILD_PATH)
+
+# Horrible, but needed.
+$(shell $(MKDIR) $(BUILD_PATH))
+
+$(foreach line,$(shell $(ARD_HOME)/arduino-builder -dump-prefs -logger=machine $(BUILDER_OPTS) -build-path "$(BUILD_PATH)" | $(GREP) -v === | $(SED) -e '/^\s*#/d;/.*=\s*$$/d;/.*\..*=.*/!d;s/\./_aDjOkT_/g;s/{{/"/g;s/}}/"/g;s/{/\$${/g;/^\s*$$/d;s/ /_aSjPkC_/g;s/$$/ /g;s/=/\=/' | $(GREP) -ve "^build_aDjOkT_"),$(eval $(subst _aSjPkC_, ,$(line))))
+
+path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(runtime_aDjOkT_tools_aDjOkT_$(upload_aDjOkT_tool)_aDjOkT_path)))
+ifeq ($(strip $(path)),)
+path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(runtime_aDjOkT_hardware_aDjOkT_path)))
+endif
+ifeq ($(strip $(config_aDjOkT_path)),)
+config_aDjOkT_path = $(tools_aDjOkT_$(upload_aDjOkT_tool)_aDjOkT_config_aDjOkT_path)
+endif
+
+
+cmd = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(upload_aDjOkT_tool)_aDjOkT_cmd)))
+cmd_aDjOkT_path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(upload_aDjOkT_tool)_aDjOkT_cmd_aDjOkT_path)))
+UPLOAD = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(upload_aDjOkT_tool)_aDjOkT_upload_aDjOkT_pattern)))
+
+#debugging dump
+#$(foreach line,$(shell $(ARD_HOME)/arduino-builder -dump-prefs -logger=machine $(BUILDER_OPTS) -build-path "$(BUILD_PATH)" | $(GREP) -v === | $(SED) -e '/^\s*#/d;/.*=\s*$$/d;/.*\..*=.*/!d;s/\./_aDjOkT_/g;s/{/\$${/g;/^\s*$$/d;s/ /_aSjPkC_/g;s/$$/ /g;s/=/\=/'),$(info $(subst _aSjPkC_, ,$(line))))
+#$(info cmd.path $(cmd_aDjOkT_path) path $(path) cmd $(cmd))
+#$(info UPLOAD $(UPLOAD))
+#$(info build_aDjOkT_extra_flags $(build_aDjOkT_extra_flags))
+#$(error "dump done")
+
+
+define upload-hex
+	$(UPLOAD)
+endef
+
+
+# Platform-specific settings.
+ifeq "$(PLATFORM)" "SunOS"
+    define monitor-target
+        gnome-terminal -t '$(BOARD) $(CPORT)' \
+        -e 'env -i tip -$(MON_SPEED) $(CPORT)' &
+    endef
+    ifeq "$(CPORT)" "$(PORT)"
+        define kill-monitor
+            - pkill -f 'tip.*$(CPORT)'
+        endef
+    endif
+else ifeq "$(PLATFORM)" "Linux"
+    ifeq ($(MON_SPEED),$(filter $(MON_SPEED), 230400 500000 1000000))
+
+        define monitor-target
+            cu -l $(CPORT) -s $(MON_SPEED)
+        endef
+    else
+        define monitor-target
+            screen $(CPORT) $(MON_SPEED)
+        endef
+    endif
+    ifeq "$(CPORT)" "$(PORT)"
+        define kill-monitor
+            - pkill -f 'screen.*$(CPORT)'
+            - pkill -f 'cu.*$(CPORT)'
+        endef
+    endif
+
+else ifeq "$(PLATFORM)" "Darwin"
+    define monitor-target
+        screen $(CPORT) $(MON_SPEED)
+    endef
+    ifeq "$(CPORT)" "$(PORT)"
+        define kill-monitor
+            - pkill -f 'screen.*$(CPORT)'
+        endef
+    endif
+else
+    $(error Unknown platform $(PLATFORM))
+endif
+
+
+
+
+all: build
+
+$(build_aDjOkT_path)/$(build_aDjOkT_project_name)._hex:
+	$(ARD_HOME)/arduino-builder -compile -warnings=all -verbose=true -logger=human $(BUILDER_OPTS) -build-path "$(BUILD_PATH)" "$(SKETCH)"
+
+build: $(build_aDjOkT_path)/$(build_aDjOkT_project_name)._hex
+
+clean:
+	@$(RM) -fr $(BUILD_PATH)
+	@sync
+
+squeeky:
+	@$(RM) -fr $(BUILD_PATH_BASE)
+	@sync
+
+upload: build
+	$(kill-monitor)
+	$(upload-hex)
+
+monitor:
+	$(kill-monitor)
+	$(monitor-target)
+
+upmon: upload monitor
+
