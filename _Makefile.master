@@ -196,51 +196,6 @@ ifeq ($(wildcard $(ARD_HOME)),)
     $(error $(ARD_HOME) does not exist)
 endif
 
-# Platform-specific settings.
-ifeq "$(PLATFORM)" "SunOS"
-    define monitor-target
-        gnome-terminal -t '$(BOARD) $(CPORT)' \
-        -e 'env -i tip -$(MON_SPEED) $(CPORT)' &
-    endef
-    ifeq "$(CPORT)" "$(PORT)"
-        define kill-monitor
-            - pkill -f 'tip.*$(CPORT)'
-            - sleep 10
-        endef
-    endif
-else ifeq "$(PLATFORM)" "Linux"
-    ifeq ($(MON_SPEED),$(filter $(MON_SPEED), 230400 500000 1000000)) 
-        define monitor-target
-            cu -l $(CPORT) -s $(MON_SPEED)
-        endef
-    else
-        define monitor-target
-            screen $(CPORT) $(MON_SPEED)
-        endef
-    endif
-    ifeq "$(CPORT)" "$(PORT)"
-        define kill-monitor
-            - pkill -f 'screen.*$(CPORT)'
-            - pkill -f 'cu.*$(CPORT)'
-            - sleep 10
-        endef
-    endif
-
-else ifeq "$(PLATFORM)" "Darwin"
-    define monitor-target
-        screen $(CPORT) $(MON_SPEED)
-    endef
-    ifeq "$(CPORT)" "$(PORT)"
-        define kill-monitor
-            - pkill -f 'screen.*$(CPORT)'
-            - pkill -f 'cu.*$(CPORT)'
-            - sleep 10
-        endef
-    endif
-else
-    $(error Unknown platform $(PLATFORM))
-endif
-
 OBJ_PATH_BASE ?=../build
 # Standard macros.
 SKETCH =$(shell basename $(CURDIR)).ino
@@ -323,7 +278,7 @@ build_aDjOkT_project_name=$(SKETCH)
 build.extra_flags=-DEXTRA $(EXTRA_FLAGS) -DFLAGS
 
 ifneq ($(strip $(EXTRA_FLAGS)),)
-BUILDER_EXTRA+="-prefs=build.extra_flags=$(EXTRA_FLAGS)"
+BUILDER_EXTRA+=-prefs="build.extra_flags=$(EXTRA_FLAGS)"
 endif
 
 BUILDER_HW=-fqbn=$(BOARD) -hardware "$(ARD_HOME)/hardware" -hardware "$(HOME)/.arduino15/packages" -hardware "$(HOME)/Arduino/hardware"
@@ -397,8 +352,9 @@ else ifeq "$(PLATFORM)" "Linux"
     endif
     ifeq "$(CPORT)" "$(PORT)"
         define kill-monitor
-            - pkill -f 'screen.*$(CPORT)'
-            - pkill -f 'cu.*$(CPORT)'
+            -pkill -f 'cu.*$(CPORT)'
+            -pkill -f 'screen.*$(CPORT)'
+            sleep 2
         endef
     endif
 
@@ -408,7 +364,7 @@ else ifeq "$(PLATFORM)" "Darwin"
     endef
     ifeq "$(CPORT)" "$(PORT)"
         define kill-monitor
-            - pkill -f 'screen.*$(CPORT)'
+            -pkill -f 'screen.*$(CPORT)'
         endef
     endif
 else
@@ -420,7 +376,7 @@ endif
 
 all: build
 
-$(build_aDjOkT_path)/$(build_aDjOkT_project_name)._hex:
+$(build_aDjOkT_path)/$(build_aDjOkT_project_name)._hex: $(EXTRA_BUILD_RULES)
 	$(ARD_HOME)/arduino-builder -compile -warnings=all -verbose=true -logger=human $(BUILDER_OPTS) -build-path "$(BUILD_PATH)" "$(SKETCH)"
 
 build: $(build_aDjOkT_path)/$(build_aDjOkT_project_name)._hex
@@ -442,4 +398,3 @@ monitor:
 	$(monitor-target)
 
 upmon: upload monitor
-
