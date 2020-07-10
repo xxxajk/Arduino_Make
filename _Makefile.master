@@ -280,6 +280,7 @@ build.extra_flags=-DEXTRA $(EXTRA_FLAGS) -DFLAGS
 ifneq ($(strip $(EXTRA_FLAGS)),)
 BUILDER_EXTRA+=-prefs="build.extra_flags=$(EXTRA_FLAGS)"
 endif
+#$(info BUILDER_EXTRA $(BUILDER_EXTRA))
 
 BUILDER_HW=-fqbn=$(BOARD) -hardware "$(ARD_HOME)/hardware" -hardware "$(HOME)/.arduino15/packages" -hardware "$(HOME)/Arduino/hardware"
 BUILDER_TOOLS=-tools "$(ARD_HOME)/tools-builder" -tools "$(ARD_HOME)/hardware" -tools "$(HOME)/.arduino15/packages" -tools "$(HOME)/Arduino/hardware"
@@ -302,25 +303,32 @@ $(shell $(MKDIR) $(BUILD_PATH))
 
 $(foreach line,$(shell $(ARD_HOME)/arduino-builder -dump-prefs -logger=machine $(BUILDER_OPTS) -build-path "$(BUILD_PATH)" | $(GREP) -v === | $(SED) -e '/^\s*#/d;/.*=\s*$$/d;/.*\..*=.*/!d;s/\./_aDjOkT_/g;s/{{/"/g;s/}}/"/g;s/{/\$${/g;/^\s*$$/d;s/ /_aSjPkC_/g;s/$$/ /g;s/=/\=/' | $(GREP) -ve "^build_aDjOkT_"),$(eval $(subst _aSjPkC_, ,$(line))))
 
-path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(runtime_aDjOkT_tools_aDjOkT_$(upload_aDjOkT_tool)_aDjOkT_path)))
+#
+# Normalize the tool name, everything before a ":" is not useful to us
+#
+fixed_upload_aDjOkT_tool=$(lastword $(subst :, ,$(upload_aDjOkT_tool)))
+
+path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(runtime_aDjOkT_tools_aDjOkT_$(fixed_upload_aDjOkT_tool)_aDjOkT_path)))
 ifeq ($(strip $(path)),)
 path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(runtime_aDjOkT_hardware_aDjOkT_path)))
 endif
 ifeq ($(strip $(config_aDjOkT_path)),)
-config_aDjOkT_path = $(tools_aDjOkT_$(upload_aDjOkT_tool)_aDjOkT_config_aDjOkT_path)
+config_aDjOkT_path = $(tools_aDjOkT_$(fixed_upload_aDjOkT_tool)_aDjOkT_config_aDjOkT_path)
 endif
 
 
-cmd = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(upload_aDjOkT_tool)_aDjOkT_cmd)))
-cmd_aDjOkT_path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(upload_aDjOkT_tool)_aDjOkT_cmd_aDjOkT_path)))
-UPLOAD = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(upload_aDjOkT_tool)_aDjOkT_upload_aDjOkT_pattern)))
+cmd = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(fixed_upload_aDjOkT_tool)_aDjOkT_cmd)))
+cmd_aDjOkT_path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(fixed_upload_aDjOkT_tool)_aDjOkT_cmd_aDjOkT_path)))
+UPLOAD = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(fixed_upload_aDjOkT_tool)_aDjOkT_upload_aDjOkT_pattern)))
 
 #debugging dump
 #$(foreach line,$(shell $(ARD_HOME)/arduino-builder -dump-prefs -logger=machine $(BUILDER_OPTS) -build-path "$(BUILD_PATH)" | $(GREP) -v === | $(SED) -e '/^\s*#/d;/.*=\s*$$/d;/.*\..*=.*/!d;s/\./_aDjOkT_/g;s/{/\$${/g;/^\s*$$/d;s/ /_aSjPkC_/g;s/$$/ /g;s/=/\=/'),$(info $(subst _aSjPkC_, ,$(line))))
+#$(info fixed_upload.tool $(fixed_upload_aDjOkT_tool))
 #$(info cmd.path $(cmd_aDjOkT_path) path $(path) cmd $(cmd))
 #$(info UPLOAD $(UPLOAD))
 #$(info build_aDjOkT_extra_flags $(build_aDjOkT_extra_flags))
 #$(error "dump done")
+$(info BUILDER_OPTS $(BUILDER_OPTS))
 
 
 define upload-hex
