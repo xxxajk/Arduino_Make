@@ -105,7 +105,9 @@ TR ?=tr
 READLINK ?=readlink
 BASENAME ?=basename
 ECHO ?=echo
+NPROC ?=nproc
 
+CPUMULT ?=2
 
 DEBUG_Makefile ?=0
 
@@ -151,6 +153,7 @@ endif
 endif
 
 DATESECONDS :=$(shell date -u +"%s")
+NCPUS ?=$(shell $(ECHO) -n $$(($$($(NPROC)) * $(CPUMULT))))
 
 MON_SPEED ?=115200
 
@@ -285,7 +288,7 @@ endif
 BUILDER_HW=-fqbn=$(BOARD) -hardware "$(ARD_HOME)/hardware" -hardware "$(HOME)/.arduino15/packages" -hardware "$(HOME)/Arduino/hardware"
 BUILDER_TOOLS=-tools "$(ARD_HOME)/tools-builder" -tools "$(ARD_HOME)/hardware" -tools "$(HOME)/.arduino15/packages" -tools "$(HOME)/Arduino/hardware"
 BUILDER_LIBS=-built-in-libraries "$(ARD_HOME)/libraries" -libraries "$(HOME)/Arduino/libraries" 
-BUILDER_EXTRA+= -prefs=build.warn_data_percentage=75 
+BUILDER_EXTRA+= -prefs=build.warn_data_percentage=75 -jobs $(NCPUS)
 BUILDER_OPTS=$(BUILDER_EXTRA) -ide-version=$(ARD_REV) $(BUILDER_HW) $(BUILDER_TOOLS) $(BUILDER_LIBS)
 
 # Get build info _ONLY_
