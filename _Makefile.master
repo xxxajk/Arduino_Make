@@ -67,7 +67,7 @@
 #        CPORT                : what device/network url to use for the monitor, if not given, defaults to the value used for PORT
 #
 # Before using this Makefile you can define the following macros to suit
-# your environment, either by editing this file directly, or by defining them 
+# your environment, either by editing this file directly, or by defining them
 # in the Makefile that includes this one, in which case they will override the
 # default or automatically discovered definitions.
 #
@@ -126,13 +126,15 @@ endif
 $(info Gathering build parameters...)
 #
 # Working shell list:
-WORKING_SH =/bin/ash /bin/bash /bin/ksh /bin/dash
+WORKING_SH =/bin/ash /bin/bash /bin/ksh /bin/dash /usr/bin/ash /usr/bin/bash /usr/bin/ksh /usr/bin/dash
 
 #
 # Not working, and may never work
-BROKEN_SH =/bin/zsh /bin/csh /bin/tcsh /bin/rksh
+BROKEN_SH =/bin/zsh /bin/csh /bin/tcsh /bin/rksh /usr/bin/zsh /usr/bin/csh /usr/bin/tcsh /usr/bin/rksh
 
 REAL_SH=$(strip $(shell $(READLINK) -f $(SHELL)))
+$(info SHELL $(SHELL) REAL_SH $(REAL_SH))
+
 ifneq ($(strip $(findstring $(SHELL),$(BROKEN_SH))),)
 $(info Your shell $(SHELL) aka $(REAL_SH) is broken, please use another shell)
 $(info Known working shells are $(WORKING_SH))
@@ -287,7 +289,7 @@ endif
 
 BUILDER_HW=-fqbn=$(BOARD) -hardware "$(ARD_HOME)/hardware" -hardware "$(HOME)/.arduino15/packages" -hardware "$(HOME)/Arduino/hardware"
 BUILDER_TOOLS=-tools "$(ARD_HOME)/tools-builder" -tools "$(ARD_HOME)/hardware" -tools "$(HOME)/.arduino15/packages" -tools "$(HOME)/Arduino/hardware"
-BUILDER_LIBS=-built-in-libraries "$(ARD_HOME)/libraries" -libraries "$(HOME)/Arduino/libraries" 
+BUILDER_LIBS=-built-in-libraries "$(ARD_HOME)/libraries" -libraries "$(HOME)/Arduino/libraries"
 BUILDER_EXTRA+= -prefs=build.warn_data_percentage=75 -jobs $(NCPUS)
 BUILDER_OPTS=$(BUILDER_EXTRA) -ide-version=$(ARD_REV) $(BUILDER_HW) $(BUILDER_TOOLS) $(BUILDER_LIBS)
 
@@ -311,25 +313,29 @@ $(foreach line,$(shell $(ARD_HOME)/arduino-builder -dump-prefs -logger=machine $
 #
 fixed_upload_aDjOkT_tool=$(lastword $(subst :, ,$(upload_aDjOkT_tool)))
 
-path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(runtime_aDjOkT_tools_aDjOkT_$(fixed_upload_aDjOkT_tool)_aDjOkT_path)))
+wanted_tool?=$(fixed_upload_aDjOkT_tool)
+
+path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(runtime_aDjOkT_tools_aDjOkT_$(wanted_tool)_aDjOkT_path)))
 ifeq ($(strip $(path)),)
 path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(runtime_aDjOkT_hardware_aDjOkT_path)))
 endif
 ifeq ($(strip $(config_aDjOkT_path)),)
-config_aDjOkT_path = $(tools_aDjOkT_$(fixed_upload_aDjOkT_tool)_aDjOkT_config_aDjOkT_path)
+config_aDjOkT_path = $(tools_aDjOkT_$(wanted_tool)_aDjOkT_config_aDjOkT_path)
 endif
 
 
-cmd = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(fixed_upload_aDjOkT_tool)_aDjOkT_cmd)))
-cmd_aDjOkT_path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(fixed_upload_aDjOkT_tool)_aDjOkT_cmd_aDjOkT_path)))
-UPLOAD = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(fixed_upload_aDjOkT_tool)_aDjOkT_upload_aDjOkT_pattern)))
+cmd = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(wanted_tool)_aDjOkT_cmd)))
+cmd_aDjOkT_path = $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(wanted_tool)_aDjOkT_cmd_aDjOkT_path)))
+UPLOAD ?= $(subst _aPjLkS_,+,$(subst _aDjOkT_,.,$(tools_aDjOkT_$(wanted_tool)_aDjOkT_upload_aDjOkT_pattern)))
 
 #debugging dump
 #$(foreach line,$(shell $(ARD_HOME)/arduino-builder -dump-prefs -logger=machine $(BUILDER_OPTS) -build-path "$(BUILD_PATH)" | $(GREP) -v === | $(SED) -e '/^\s*#/d;/.*=\s*$$/d;/.*\..*=.*/!d;s/\./_aDjOkT_/g;s/{/\$${/g;/^\s*$$/d;s/ /_aSjPkC_/g;s/$$/ /g;s/=/\=/'),$(info $(subst _aSjPkC_, ,$(line))))
 #$(info fixed_upload.tool $(fixed_upload_aDjOkT_tool))
+#$(info wanted_tool $(wanted_tool))
 #$(info cmd.path $(cmd_aDjOkT_path) path $(path) cmd $(cmd))
 #$(info UPLOAD $(UPLOAD))
 #$(info build_aDjOkT_extra_flags $(build_aDjOkT_extra_flags))
+#$(info BUILDER_OPTS $(BUILDER_OPTS))
 #$(error "dump done")
 $(info BUILDER_OPTS $(BUILDER_OPTS))
 
@@ -384,13 +390,12 @@ endif
 
 
 
-
 all: build
 
 $(build_aDjOkT_path)/$(build_aDjOkT_project_name)._hex: $(EXTRA_BUILD_RULES)
 	$(ARD_HOME)/arduino-builder -compile -warnings=all -verbose=true -logger=human $(BUILDER_OPTS) -build-path "$(BUILD_PATH)" "$(SKETCH)"
 
-build: $(build_aDjOkT_path)/$(build_aDjOkT_project_name)._hex
+build: $(PROJECT_PRE) $(build_aDjOkT_path)/$(build_aDjOkT_project_name)._hex
 
 clean:
 	@$(RM) -fr $(BUILD_PATH)
