@@ -353,7 +353,7 @@ ifeq "$(PLATFORM)" "SunOS"
     endef
     ifeq "$(CPORT)" "$(PORT)"
         define kill-monitor
-            - pkill -f 'tip.*$(CPORT)'
+            - pkill -f '^tip.*$(CPORT)'
         endef
     endif
 else ifeq "$(PLATFORM)" "Linux"
@@ -369,8 +369,8 @@ else ifeq "$(PLATFORM)" "Linux"
     endif
     ifeq "$(CPORT)" "$(PORT)"
         define kill-monitor
-            -pkill -f 'cu.*$(CPORT)'
-            -pkill -f 'screen.*$(CPORT)'
+            -pkill -f '^cu.*$(CPORT)'
+            -pkill -f '^screen.*$(CPORT)'
             sleep 2
         endef
     endif
@@ -381,7 +381,7 @@ else ifeq "$(PLATFORM)" "Darwin"
     endef
     ifeq "$(CPORT)" "$(PORT)"
         define kill-monitor
-            -pkill -f 'screen.*$(CPORT)'
+            -pkill -f '^screen.*$(CPORT)'
         endef
     endif
 else
